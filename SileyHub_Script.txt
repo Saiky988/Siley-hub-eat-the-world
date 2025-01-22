@@ -1,0 +1,357 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Tạo cửa sổ chính
+local Window = Rayfield:CreateWindow({
+    Name = "SileyHub | Saiky",
+    Icon = 0,
+    LoadingTitle = "SileyHub",
+    LoadingSubtitle = "by Saiky",
+    Theme = "Light", 
+    DisableRayfieldPrompts = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "Big Hub"
+    },
+    Discord = {
+        Enabled = true,
+        Invite = ".gg/uhq8nMBf",
+        RememberJoins = true
+    },
+    KeySystem = true,
+    KeySettings = {
+        Title = "Key System",
+        Subtitle = "Key",
+        Note = "Contact admin for key",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"638911"}
+    }
+})
+
+local MainTab = Window:CreateTab("Main", 4483362458) -- Main Tab
+local MiscTab = Window:CreateTab("Misc", 4483362458) -- Misc Tab
+local SettingTab = Window:CreateTab("Setting", 4483362458) -- Setting Tab
+
+-- Trạng thái
+local isTeleporting = false
+local isGrabbing = false
+local isEating = false
+local isAutoSell = false  -- Trạng thái Auto Sell
+local isAutoThrow = false  -- Trạng thái Auto Throw
+local grabSpeed = 1.5 -- Tốc độ Grab mặc định (giây)
+local eatSpeed = 0.3  -- Tốc độ Eat mặc định (giây)
+local sellSpeed = 0.5 -- Tốc độ bán mặc định (giây)
+local throwSpeed = 0.5 -- Tốc độ ném mặc định (giây)
+local originalGravity = workspace.Gravity
+local GravityEnabled = false
+local ToggleEnabled = false
+local AntiAFKEnabled = false  -- Biến Anti-AFK
+
+-- *** MAIN ***
+MainTab:CreateToggle({
+    Name = "Random Teleport",
+    CurrentValue = false,
+    Flag = "Toggle_Teleport",
+    Callback = function(Value)
+        isTeleporting = Value
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Grab",
+    CurrentValue = false,
+    Flag = "Toggle_Grab",
+    Callback = function(Value)
+        isGrabbing = Value
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Eat",
+    CurrentValue = false,
+    Flag = "Toggle_Eat",
+    Callback = function(Value)
+        isEating = Value
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Sell",
+    CurrentValue = false,
+    Flag = "Toggle_AutoSell",
+    Callback = function(Value)
+        isAutoSell = Value
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Throw",
+    CurrentValue = false,
+    Flag = "Toggle_AutoThrow",
+    Callback = function(Value)
+        isAutoThrow = Value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Grab Speed",
+    Range = {0.5, 5},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = grabSpeed,
+    Flag = "GrabSpeedSlider",
+    Callback = function(value)
+        grabSpeed = value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Eat Speed",
+    Range = {0.1, 3},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = eatSpeed,
+    Flag = "EatSpeedSlider",
+    Callback = function(value)
+        eatSpeed = value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Sell Speed",
+    Range = {0.1, 400},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = sellSpeed,
+    Flag = "SellSpeedSlider",
+    Callback = function(value)
+        sellSpeed = value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Throw Speed",
+    Range = {0.1, 400},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = throwSpeed,
+    Flag = "ThrowSpeedSlider",
+    Callback = function(value)
+        throwSpeed = value
+    end,
+})
+
+-- Hàm dịch chuyển ngẫu nhiên
+local function teleportRandomly()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        local x, y, z = math.random(-100, 100), math.random(10, 50), math.random(-100, 100)
+        humanoidRootPart.CFrame = CFrame.new(x, y, z)
+    end
+end
+
+-- Hàm Grab
+local function grab()
+    local args = {[1] = false, [2] = false}
+    game.Players.LocalPlayer.Character.Events.Grab:FireServer(unpack(args))
+end
+
+-- Hàm Eat (15 lần liên tiếp)
+local function eatMultipleTimes(times)
+    for i = 1, times do
+        game.Players.LocalPlayer.Character.Events.Eat:FireServer()
+        task.wait(eatSpeed)  -- Đảm bảo ăn liên tục với tốc độ eatSpeed
+    end
+end
+
+-- Hàm Auto Sell
+local function autoSell()
+    while isAutoSell do
+        local player = game.Players.LocalPlayer
+        local sellButton = player.PlayerGui:FindFirstChild("ScreenGui") and player.PlayerGui.ScreenGui:FindFirstChild("Sell")
+        
+        if sellButton then
+            sellButton.SellScript:FireServer()  -- Gọi script bán
+            task.wait(sellSpeed)  -- Đợi trong khoảng thời gian sellSpeed trước khi bán lại
+        end
+        task.wait(0.1)  -- Kiểm tra lại mỗi giây
+    end
+end
+
+-- Hàm Auto Throw
+local function autoThrow()
+    while isAutoThrow do
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local throwEvent = character:FindFirstChild("Events") and character.Events:FindFirstChild("Throw")
+        
+        if throwEvent then
+            throwEvent:FireServer()  -- Thực hiện ném
+            task.wait(throwSpeed)  -- Đợi trong khoảng thời gian throwSpeed trước khi ném lại
+        end
+        task.wait(0.1)  -- Kiểm tra lại mỗi giây
+    end
+end
+
+-- Bắt đầu vòng lặp Auto Sell
+coroutine.wrap(function()
+    while true do
+        if isAutoSell then
+            autoSell()
+        end
+        if isAutoThrow then
+            autoThrow()
+        end
+        task.wait(0.1)
+    end
+end)()
+
+-- *** MISC ***
+MiscTab:CreateToggle({
+    Name = "Anti Ragdoll",
+    CurrentValue = false,
+    Flag = "AntiRagdollToggle",
+    Callback = function(state)
+        AntiRagdollEnabled = state
+    end,
+})
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    if AntiRagdollEnabled then
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+end)
+
+-- Gravity
+MiscTab:CreateToggle({
+    Name = "Enable Custom Gravity",
+    CurrentValue = false,
+    Flag = "GravityToggle",
+    Callback = function(state)
+        GravityEnabled = state
+        if not state then
+            workspace.Gravity = originalGravity
+        end
+    end,
+})
+
+MiscTab:CreateSlider({
+    Name = "Gravity Adjustment",
+    Range = {10, 300},
+    Increment = 10,
+    Suffix = "Gravity",
+    CurrentValue = originalGravity,
+    Flag = "GravitySlider",
+    Callback = function(value)
+        if GravityEnabled then
+            workspace.Gravity = value
+        end
+    end,
+})
+
+-- Speed and Jump Adjustments
+MiscTab:CreateToggle({
+    Name = "Enable Adjustments",
+    CurrentValue = false,
+    Flag = "ToggleAdjustments",
+    Callback = function(state)
+        ToggleEnabled = state
+        if not state then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
+    end,
+})
+
+MiscTab:CreateSlider({
+    Name = "Speed",
+    Range = {16, 100},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(value)
+        if ToggleEnabled then
+            humanoid.WalkSpeed = value
+        end
+    end,
+})
+
+MiscTab:CreateSlider({
+    Name = "Jump",
+    Range = {50, 150},
+    Increment = 1,
+    Suffix = "JumpPower",
+    CurrentValue = 50,
+    Flag = "JumpSlider",
+    Callback = function(value)
+        if ToggleEnabled then
+            humanoid.JumpPower = value
+        end
+    end,
+})
+
+-- *** SETTING ***
+SettingTab:CreateToggle({
+    Name = "Enable Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAFKToggle",
+    Callback = function(state)
+        AntiAFKEnabled = state
+    end,
+})
+
+-- Hàm Anti-AFK
+local function antiAFK()
+    while AntiAFKEnabled do
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local humanoid = character:FindFirstChild("Humanoid")
+        
+        if humanoid then
+            humanoid:Move(Vector3.new(0, 0, 0))  -- Thực hiện một hành động nhỏ để tránh bị AFK
+            task.wait(10)  -- Làm việc mỗi 10 giây để ngăn AFK
+        end
+        task.wait(1)  -- Kiểm tra lại mỗi giây
+    end
+end
+
+-- Bắt đầu vòng lặp Anti-AFK
+coroutine.wrap(function()
+    antiAFK()
+end)()
+
+-- Thêm nút script Lua vào tab Setting
+SettingTab:CreateButton({
+    Name = "Infinite-Yield",
+    Callback = function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Infinite-Yield_500"))()
+    end,
+})
+
+SettingTab:CreateButton({
+    Name = "Shift lock",
+    Callback = function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Universal-Shift-Lock-6655"))()
+    end,
+})
+
+-- Vòng lặp chính
+coroutine.wrap(function()
+    while true do
+        if isTeleporting then
+            teleportRandomly()
+        end
+        if isGrabbing then
+            grab()
+        end
+        if isEating then
+            eatMultipleTimes(15)
+        end
+        task.wait(0.1)
+    end
+end)()
